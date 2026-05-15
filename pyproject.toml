@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anchor-agentic-provenance"
+version = "0.1.0"
+description = "Provenance capture and analysis for agentic workflows."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Valesca Moura de Sousa" }
+]
+dependencies = [
+  "opentelemetry-sdk==1.39.1",
+  "opentelemetry-exporter-otlp==1.39.1",
+  "tinydb==4.8.2",
+  "prov==2.1.1",
+  "openinference-instrumentation-beeai==0.1.15",
+  "arize-phoenix[evals]>=13.18.2",
+  "lxml>=6.1.0",
+  "rdflib>=7.6.0",
+  "dot>=0.3.0",
+]
+
+[project.optional-dependencies]
+beeai = [
+  "beeai-framework==0.1.77",
+  "fastapi==0.120.3",
+  "fastmcp==2.13.0.2",
+  "biopython==1.86",
+  "python-dotenv",
+]
+
+[tool.setuptools]
+packages = [
+  "anchor",
+  "anchor.model",
+  "anchor.observability",
+  "anchor.prov",
+  "anchor.telemetry",
+  "anchor.telemetry.persistence",
+]
+
+[tool.setuptools.package-dir]
+anchor = "src"

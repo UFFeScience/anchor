@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+.uv-cache/
+venv/
+.env
+.anchor/
+temp
+examples/commons/phylogenetic_subtrees/data/output/*.json
+examples/commons/phylogenetic_subtrees/data/output/align
+examples/commons/phylogenetic_subtrees/data/output/validated-files
