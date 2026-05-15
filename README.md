@@ -24,10 +24,13 @@ src/anchor/
   observability/        BeeAI/OpenInference instrumentation helpers
   telemetry/            Span collection, translation, schema, and persistence
   prov/                 PROV document and graph generation
+  sailor/               SQLite provenance reuse queries and agent adapters
 
 examples/
   beeai/phylogenetic_subtrees/      BeeAI-specific bioinformatics case study
+  beeai/synthetic_tool_selection/   BeeAI consumer for Sailor validation
   commons/phylogenetic_subtrees/    Shared MCP tools and data for the case study
+  commons/synthetic_tool_selection/ Shared synthetic MCP tools and simulator
 
 docs/                   Architecture and provenance model notes
 assets/                 Images and diagrams
@@ -165,6 +168,77 @@ To inspect the SQLite database visually, you can install DB Browser for SQLite:
 ```bash
 brew install db-browser-for-sqlite
 ```
+
+## Reuse Provenance With Sailor
+
+Sailor is Anchor's provenance reuse layer. It reads only the SQLite database exported by Anchor and summarizes historical tool behavior so humans or workflow agents can make better execution choices.
+
+By default, Sailor reads:
+
+```text
+${ANCHOR_OUTPUT_PATH:-.anchor}/workflow_db.sqlite
+```
+
+Sailor ignores internal framework tools by default, including BeeAI's `think`, `final_answer`, `HandoffTool` targets, agent calls, and Sailor's own query tools, so recommendations focus on domain tools. To add more ignored tool names:
+
+```bash
+export ANCHOR_SAILOR_IGNORED_TOOLS=debug_tool,internal_router
+```
+
+To ignore additional provenance target entity types:
+
+```bash
+export ANCHOR_SAILOR_IGNORED_ENTITY_TYPES=agent,router
+```
+
+Run direct provenance queries from Python:
+
+```bash
+uv run python -c "from anchor.sailor import compare_tools; print(compare_tools())"
+uv run python -c "from anchor.sailor import get_execution_recommendations; print(get_execution_recommendations())"
+```
+
+Useful query functions:
+
+```python
+from anchor.sailor import (
+    compare_tools,
+    get_execution_recommendations,
+    get_tool_failures,
+    get_tool_performance,
+)
+```
+
+The BeeAI phylogenetic subtrees example also creates a Sailor provenance agent and gives it to the orchestrator as a `provenance_agent` handoff tool. The orchestrator can consult it before delegating workflow steps. If no SQLite history exists, Sailor reports that clearly and avoids inventing recommendations.
+
+## Synthetic Tool Selection Example
+
+The synthetic tool-selection workflow is a smaller BeeAI + MCP example designed to validate Sailor. It has one workflow with three ordered stages:
+
+```text
+cleaning -> feature extraction -> scoring
+```
+
+Each stage has multiple tools with the same purpose but different simulated success rates and runtimes. The simulator is probabilistic and reproducible with `SYNTHETIC_SEED`.
+
+Run it several times to create provenance history:
+
+```bash
+export SYNTHETIC_SEED=42
+export SYNTHETIC_TIME_SCALE=1.0
+uv run python -m examples.beeai.synthetic_tool_selection.main
+uv run python -m anchor.telemetry.persistence.tinydb_to_sql
+```
+
+Then ask Sailor to compare equivalent tools:
+
+```bash
+uv run python -c "from anchor.sailor import compare_tools; print(compare_tools(tool_names=['fast_cleaner', 'balanced_cleaner', 'strict_cleaner']))"
+uv run python -c "from anchor.sailor import compare_tools; print(compare_tools(tool_names=['quick_feature_extractor', 'robust_feature_extractor', 'experimental_feature_extractor']))"
+uv run python -c "from anchor.sailor import compare_tools; print(compare_tools(tool_names=['fast_scorer', 'accurate_scorer', 'unstable_scorer']))"
+```
+
+Use `OUTPUT_PATH` to redirect synthetic workflow outputs and `ANCHOR_OUTPUT_PATH` to redirect Anchor provenance outputs.
 
 ## Generate PROV Artifacts
 

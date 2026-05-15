@@ -1,0 +1,9 @@
+{
+  "records": [
+    {"id": "case-001", "raw_value": "alpha", "noise": 0.12},
+    {"id": "case-002", "raw_value": "beta", "noise": 0.34},
+    {"id": "case-003", "raw_value": "gamma", "noise": 0.08},
+    {"id": "case-004", "raw_value": "delta", "noise": 0.51},
+    {"id": "case-005", "raw_value": "epsilon", "noise": 0.27}
+  ]
+}

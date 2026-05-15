@@ -9,8 +9,16 @@ __pycache__/
 .uv-cache/
 venv/
 .env
+
+# core
 .anchor/
-temp
+anchor_files/
+temp/
+
+# use cases
 examples/commons/phylogenetic_subtrees/data/output/*.json
 examples/commons/phylogenetic_subtrees/data/output/align
 examples/commons/phylogenetic_subtrees/data/output/validated-files
+
+examples/commons/synthetic_tool_selection/data/output/*.json
+examples/commons/synthetic_tool_selection/data/output/*/*.json
