@@ -17,7 +17,7 @@ The project focuses on representing how agents, tools, users, model calls, deleg
 ## Repository Layout
 
 ```text
-src/
+src/anchor/
   model/                Interaction-centric provenance model
   observability/        BeeAI/OpenInference instrumentation helpers
   telemetry/            Span collection, translation, schema, and persistence
@@ -53,10 +53,13 @@ brew install ollama
 Then create a local Python environment and install Anchor with the BeeAI example dependencies:
 
 ```bash
-uv venv --python 3.12
-source .venv/bin/activate
+export UV_PROJECT_ENVIRONMENT=venv
+uv venv --python 3.12 venv
+source venv/bin/activate
 uv sync --extra beeai
 ```
+
+Anchor uses a `src/` package layout. Use a non-hidden virtual environment directory such as `venv`, not `.venv`, because some Python/uv combinations skip `.pth` files inside hidden environment paths. If that happens, imports such as `import anchor` will fail even though the project is installed.
 
 If `uv sync --extra beeai` does not install the editable project in your local setup, use:
 
@@ -187,8 +190,9 @@ brew install uv
 brew install mafft
 brew install ollama
 
-uv venv --python 3.12
-source .venv/bin/activate
+export UV_PROJECT_ENVIRONMENT=venv
+uv venv --python 3.12 venv
+source venv/bin/activate
 uv sync --extra beeai
 cp .env.example .env
 
@@ -200,6 +204,7 @@ Then, in another terminal:
 ```bash
 cd anchor
 
+export UV_PROJECT_ENVIRONMENT=venv
 ollama pull granite3.3:8b
 
 uv run python -m examples.beeai.phylogenetic_subtrees.main
@@ -207,9 +212,21 @@ uv run python -m anchor.telemetry.persistence.tinydb_to_sql
 uv run python -m anchor.prov.mapper
 ```
 
-If you already had a `.venv` before changing the package layout and `uv run python -m anchor...` fails with `No module named 'anchor'`, reinstall the local project:
+If you already had a `.venv` before changing the package layout, the fastest temporary workaround is:
 
 ```bash
+PYTHONPATH=src uv run python -c "import anchor; print(anchor.__version__)"
+PYTHONPATH=src uv run python -m anchor.telemetry.persistence.tinydb_to_sql
+PYTHONPATH=src uv run python -m anchor.prov.mapper
+```
+
+The cleaner fix is to recreate the environment with a non-hidden directory:
+
+```bash
+rm -rf .venv
+export UV_PROJECT_ENVIRONMENT=venv
+uv venv --python 3.12 venv
+source venv/bin/activate
 uv sync --extra beeai --reinstall-package anchor-agentic-provenance
 ```
 

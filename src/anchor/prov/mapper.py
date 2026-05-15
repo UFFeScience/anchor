@@ -5,7 +5,7 @@ from pathlib import Path
 from prov.dot import prov_to_dot
 from prov.model import PROV, Namespace, ProvAgent, ProvDocument
 
-from .model.interaction_oriented import Capability, Entity, WorkflowExecution, Intention, TaskExecution, Interaction
+from anchor.model.interaction_oriented import Capability, Entity, WorkflowExecution, Intention, TaskExecution, Interaction
 
 
 # namespaces

@@ -33,15 +33,5 @@ beeai = [
   "python-dotenv",
 ]
 
-[tool.setuptools]
-packages = [
-  "anchor",
-  "anchor.model",
-  "anchor.observability",
-  "anchor.prov",
-  "anchor.telemetry",
-  "anchor.telemetry.persistence",
-]
-
-[tool.setuptools.package-dir]
-anchor = "src"
+[tool.setuptools.packages.find]
+where = ["src"]

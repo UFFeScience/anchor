@@ -2,7 +2,7 @@
 
 Anchor is organized as a core provenance framework plus standalone examples.
 
-The core package is mapped from `src/` to the import namespace `anchor.*` and contains:
+The core package lives under `src/anchor` and contains:
 
 - `model`: interaction-centric provenance schema.
 - `observability`: framework-specific instrumentation entry points.
