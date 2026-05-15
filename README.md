@@ -1,7 +1,9 @@
 
 
-<div style="text-align: center;">
-  <img src="assets/img/anchor.png" alt="Anchor logo" width="300">
+<div align="center">
+  <p>
+    <img src="assets/img/anchor.png" alt="Anchor logo" width="300">
+  </p>
   <br>
   <h3>ANalysis of agentiC workflows via HistOry and pRovenance</h3>
 </div>
@@ -156,6 +158,12 @@ Expected output:
 
 ```text
 .anchor/workflow_db.sqlite
+```
+
+To inspect the SQLite database visually, you can install DB Browser for SQLite:
+
+```bash
+brew install db-browser-for-sqlite
 ```
 
 ## Generate PROV Artifacts
