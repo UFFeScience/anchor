@@ -42,6 +42,31 @@ class SailorQueryTests(unittest.TestCase):
         self.assertIn("reliable_tool", result["recommendation"])
         self.assertIn("0 failure(s)", result["recommendation"])
 
+    def test_speed_policy_ranks_faster_tool_first(self) -> None:
+        with temporary_anchor_db() as sqlite_path:
+            insert_tool_invocation(sqlite_path, "slow_reliable_tool", "completed", duration_seconds=8)
+            insert_tool_invocation(sqlite_path, "fast_tool", "completed", duration_seconds=1)
+
+            result = compare_tools(sqlite_path, tool_names=["slow_reliable_tool", "fast_tool"], policy="speed")
+
+        self.assertEqual(result["recommended_tool"], "fast_tool")
+        self.assertEqual(result["policy"], "speed")
+
+    def test_speed_reliability_policy_penalizes_high_failure_rate(self) -> None:
+        with temporary_anchor_db() as sqlite_path:
+            insert_tool_invocation(sqlite_path, "fast_unreliable_tool", "failed", duration_seconds=1)
+            insert_tool_invocation(sqlite_path, "fast_unreliable_tool", "completed", duration_seconds=1)
+            insert_tool_invocation(sqlite_path, "slower_reliable_tool", "completed", duration_seconds=5)
+
+            result = compare_tools(
+                sqlite_path,
+                tool_names=["fast_unreliable_tool", "slower_reliable_tool"],
+                policy="speed_reliability",
+            )
+
+        self.assertEqual(result["recommended_tool"], "slower_reliable_tool")
+        self.assertEqual(result["policy"], "speed_reliability")
+
     def test_duration_summaries_ignore_missing_timestamps(self) -> None:
         with temporary_anchor_db() as sqlite_path:
             insert_tool_invocation(sqlite_path, "mixed_tool", "completed", duration_seconds=4)

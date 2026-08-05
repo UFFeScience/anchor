@@ -88,9 +88,12 @@ The default `.env` points to the bundled sample data:
 INPUT_PATH=examples/commons/phylogenetic_subtrees/data/input/testset
 OUTPUT_PATH=examples/commons/phylogenetic_subtrees/data/output
 ANCHOR_OUTPUT_PATH=.anchor
+ANCHOR_PERSISTENCE_BACKEND=sqlite
 ```
 
 `ANCHOR_OUTPUT_PATH` controls where Anchor writes its own provenance outputs. The default is `.anchor`.
+
+`ANCHOR_PERSISTENCE_BACKEND` controls telemetry persistence. The default is `sqlite`, which writes directly to `.anchor/workflow_db.sqlite`. Use `tinydb` only when you want the legacy TinyDB capture path. Both backends use the same Anchor persistence interface.
 
 ### 2. Configure Ollama
 
@@ -139,29 +142,107 @@ The runner removes previous example outputs and then starts the workflow.
 After a successful run, Anchor and the example should create:
 
 ```text
-.anchor/workflow_db.json
+.anchor/workflow_db.sqlite
 examples/commons/phylogenetic_subtrees/data/output/validated-files/
 examples/commons/phylogenetic_subtrees/data/output/align/
 examples/commons/phylogenetic_subtrees/data/output/frequent-subtrees.json
 ```
 
-Anchor stores captured workflow data under `.anchor/workflow_db.json`.
+Anchor stores captured workflow data under `.anchor/workflow_db.sqlite` by default.
 
 If you change `ANCHOR_OUTPUT_PATH`, replace `.anchor` in the paths above with your configured directory.
 
-## Export TinyDB To SQLite
+## Persistence Backend
 
-The current workflow persists to TinyDB first. To export that TinyDB database to SQLite:
+Anchor has two implemented persistence adapters:
+
+```text
+sqlite   Default backend. Writes directly to workflow_db.sqlite.
+tinydb   Legacy backend. Writes to workflow_db.json and can be exported to SQLite.
+```
+
+The active backend is selected with:
+
+```bash
+export ANCHOR_PERSISTENCE_BACKEND=sqlite
+```
+
+or:
+
+```bash
+export ANCHOR_PERSISTENCE_BACKEND=tinydb
+```
+
+Both adapters expose the same interface to the telemetry collector:
+
+```python
+workflow_def_table
+workflow_exec_table
+capability_table
+entity_table
+intention_table
+task_exec_table
+interaction_table
+
+serialize(model)
+save(table, model)
+update(table, model, id_field)
+get_by_id(table, field_name, value)
+```
+
+### SQLite Backend
+
+SQLite is the default:
+
+```bash
+export ANCHOR_PERSISTENCE_BACKEND=sqlite
+```
+
+Expected database:
+
+```text
+.anchor/workflow_db.sqlite
+```
+
+The SQLite backend creates the schema if needed and preserves existing tables:
+
+```text
+create_schema(drop_existing=False)
+```
+
+Across multiple workflow executions, Anchor appends new provenance records to the same SQLite database. If a record with the same provenance id appears again, it is updated with `INSERT ... ON CONFLICT DO UPDATE`.
+
+Use SQLite when you want Sailor to query provenance directly with no export step.
+
+### TinyDB Backend
+
+TinyDB is still available as a configurable legacy backend:
+
+```bash
+export ANCHOR_PERSISTENCE_BACKEND=tinydb
+```
+
+Expected database:
+
+```text
+.anchor/workflow_db.json
+```
+
+Across multiple workflow executions, TinyDB also accumulates provenance unless the JSON file is deleted by a script or manually removed.
+
+Use TinyDB when you want to keep the older capture format. To export TinyDB to SQLite for Sailor:
 
 ```bash
 uv run python -m anchor.telemetry.persistence.tinydb_to_sql
 ```
 
-Expected output:
+The export recreates the SQLite database from the current TinyDB JSON contents:
 
 ```text
-.anchor/workflow_db.sqlite
+.anchor/workflow_db.json -> .anchor/workflow_db.sqlite
 ```
+
+So with TinyDB, run workflows multiple times first, then export when you want a SQLite snapshot.
 
 To inspect the SQLite database visually, you can install DB Browser for SQLite:
 
@@ -171,7 +252,7 @@ brew install db-browser-for-sqlite
 
 ## Reuse Provenance With Sailor
 
-Sailor is Anchor's provenance reuse layer. It reads only the SQLite database exported by Anchor and summarizes historical tool behavior so humans or workflow agents can make better execution choices.
+Sailor is Anchor's provenance reuse layer. It reads only Anchor's SQLite database and summarizes historical tool behavior so humans or workflow agents can make better execution choices. With the default SQLite backend, no export step is required before using Sailor. With the TinyDB backend, export TinyDB to SQLite before asking Sailor for recommendations.
 
 By default, Sailor reads:
 
@@ -196,6 +277,15 @@ Run direct provenance queries from Python:
 ```bash
 uv run python -c "from anchor.sailor import compare_tools; print(compare_tools())"
 uv run python -c "from anchor.sailor import get_execution_recommendations; print(get_execution_recommendations())"
+```
+
+Sailor recommendation policy can be configured with:
+
+```bash
+export ANCHOR_SAILOR_POLICY=reliability
+export ANCHOR_SAILOR_POLICY=speed
+export ANCHOR_SAILOR_POLICY=speed_reliability
+export ANCHOR_SAILOR_MAX_FAILURE_RATE=0.2
 ```
 
 Useful query functions:
@@ -227,7 +317,6 @@ Run it several times to create provenance history:
 export SYNTHETIC_SEED=42
 export SYNTHETIC_TIME_SCALE=1.0
 uv run python -m examples.beeai.synthetic_tool_selection.main
-uv run python -m anchor.telemetry.persistence.tinydb_to_sql
 ```
 
 Then ask Sailor to compare equivalent tools:
@@ -290,7 +379,6 @@ export UV_PROJECT_ENVIRONMENT=venv
 ollama pull granite3.3:8b
 
 uv run python -m examples.beeai.phylogenetic_subtrees.main
-uv run python -m anchor.telemetry.persistence.tinydb_to_sql
 uv run python -m anchor.prov.mapper
 ```
 
@@ -298,7 +386,6 @@ If you already had a `.venv` before changing the package layout, the fastest tem
 
 ```bash
 PYTHONPATH=src uv run python -c "import anchor; print(anchor.__version__)"
-PYTHONPATH=src uv run python -m anchor.telemetry.persistence.tinydb_to_sql
 PYTHONPATH=src uv run python -m anchor.prov.mapper
 ```
 

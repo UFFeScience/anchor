@@ -225,16 +225,34 @@ compare_tools(
     purpose=None,
     ignored_tool_names=None,
     ignored_entity_types=None,
+    policy=None,
 )
 ```
 
 Ranks matching tools using operational evidence.
 
-Current ranking order:
+Supported policies:
 
-1. lower failure rate;
-2. lower average duration;
-3. higher invocation count.
+```text
+reliability         lower failure rate first, then lower average duration
+speed               lower average duration first, then lower failure rate
+speed_reliability   prefer tools under a maximum failure-rate threshold, then lower duration
+```
+
+The default policy is `reliability`.
+
+Configure globally:
+
+```bash
+export ANCHOR_SAILOR_POLICY=speed_reliability
+export ANCHOR_SAILOR_MAX_FAILURE_RATE=0.2
+```
+
+Or per call:
+
+```python
+compare_tools(policy="speed")
+```
 
 Returns:
 
@@ -263,6 +281,7 @@ get_execution_recommendations(
     workflow_goal=None,
     ignored_tool_names=None,
     ignored_entity_types=None,
+    policy=None,
 )
 ```
 

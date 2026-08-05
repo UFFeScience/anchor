@@ -15,8 +15,11 @@ from anchor.sailor.config import get_ignored_entity_types, get_ignored_tool_name
 
 DEFAULT_SQLITE_FILENAME = "workflow_db.sqlite"
 TOOL_INVOCATION_TYPE = "tool_invocation"
+INVALID_RECOMMENDATION_TOOL_NAMES = {"error", "unknown_tool"}
 FAILED_STATUSES = {"failed", "error", "errored"}
 SUCCESS_STATUSES = {"completed", "success", "succeeded"}
+DEFAULT_POLICY = "reliability"
+SUPPORTED_POLICIES = {"reliability", "speed", "speed_reliability"}
 
 
 def default_sqlite_path() -> Path:
@@ -31,8 +34,18 @@ def get_tool_performance(
     purpose: str | None = None,
     ignored_tool_names: str | list[str] | tuple[str, ...] | set[str] | None = None,
     ignored_entity_types: str | list[str] | tuple[str, ...] | set[str] | None = None,
+    policy: str | None = None,
 ) -> dict[str, Any]:
     """Summarize historical tool invocation performance from Anchor SQLite provenance."""
+
+    if type(tool_names) == list:
+        for tool in tool_names:
+            if tool.lower() == "mafft":
+                tool = "mafft_sequence_alignment"
+            if tool.lower() == "clustalomega" or tool.lower() == "clustalw":
+                tool = "clustalw_sequence_alignment"
+            if tool.lower() == "muscle":
+                tool = "muscle_sequence_alignment"
 
     resolved_path = _resolve_sqlite_path(sqlite_path)
     if not resolved_path.exists():
@@ -49,12 +62,24 @@ def get_tool_performance(
         return _no_data_response(resolved_path, "No matching tool invocation history was found.")
 
     summaries = [_summarize_tool(tool_name, tool_rows) for tool_name, tool_rows in _group_by_tool(rows).items()]
-    summaries.sort(key=_ranking_key)
+    resolved_policy = _resolve_policy(policy)
+    summaries.sort(key=lambda summary: _ranking_key(summary, resolved_policy))
+
+    # print("===================================== AQUI")
+    # print({
+    #     "sqlite_path": str(resolved_path),
+    #     "has_data": True,
+    #     "tool_count": len(summaries),
+    #     "policy": resolved_policy,
+    #     "tools": summaries,
+    # }
+# )
 
     return {
         "sqlite_path": str(resolved_path),
         "has_data": True,
         "tool_count": len(summaries),
+        "policy": resolved_policy,
         "tools": summaries,
     }
 
@@ -113,8 +138,18 @@ def compare_tools(
     purpose: str | None = None,
     ignored_tool_names: str | list[str] | tuple[str, ...] | set[str] | None = None,
     ignored_entity_types: str | list[str] | tuple[str, ...] | set[str] | None = None,
+    policy: str | None = None,
 ) -> dict[str, Any]:
     """Rank tools by reliability first, then duration, then historical usage."""
+
+    if type(tool_names) == list:
+        for tool in tool_names:
+            if tool.lower() == "mafft":
+                tool = "mafft_sequence_alignment"
+            if tool.lower() == "clustalomega" or tool.lower() == "clustalw":
+                tool = "clustalw_sequence_alignment"
+            if tool.lower() == "muscle":
+                tool = "muscle_sequence_alignment"
 
     performance = get_tool_performance(
         sqlite_path=sqlite_path,
@@ -122,6 +157,7 @@ def compare_tools(
         purpose=purpose,
         ignored_tool_names=ignored_tool_names,
         ignored_entity_types=ignored_entity_types,
+        policy=policy,
     )
     if not performance.get("has_data"):
         return {
@@ -133,6 +169,14 @@ def compare_tools(
     ranked_tools = performance["tools"]
     recommended = ranked_tools[0]
     alternatives = ranked_tools[1:]
+
+
+    # print("===================================== AQUI2")
+    # print({
+    #     **performance,
+    #     "recommended_tool": recommended["tool_name"],
+    #     "recommendation": _recommendation_text(recommended, alternatives),
+    # })
 
     return {
         **performance,
@@ -147,8 +191,18 @@ def get_execution_recommendations(
     workflow_goal: str | None = None,
     ignored_tool_names: str | list[str] | tuple[str, ...] | set[str] | None = None,
     ignored_entity_types: str | list[str] | tuple[str, ...] | set[str] | None = None,
+    policy: str | None = None,
 ) -> dict[str, Any]:
     """Recommend execution choices for the currently available tools."""
+
+    if type(available_tools) == list:
+        for tool in available_tools:
+            if tool.lower() == "mafft":
+                tool = "mafft_sequence_alignment"
+            if tool.lower() == "clustalomega" or tool.lower() == "clustalw":
+                tool = "clustalw_sequence_alignment"
+            if tool.lower() == "muscle":
+                tool = "muscle_sequence_alignment"
 
     purpose_filter = None if available_tools else workflow_goal
     comparison = compare_tools(
@@ -157,12 +211,14 @@ def get_execution_recommendations(
         purpose=purpose_filter,
         ignored_tool_names=ignored_tool_names,
         ignored_entity_types=ignored_entity_types,
+        policy=policy,
     )
     if not comparison.get("has_data"):
         return {
             "sqlite_path": comparison.get("sqlite_path"),
             "has_data": False,
             "workflow_goal": workflow_goal,
+            "policy": _resolve_policy(policy),
             "recommendations": [],
             "message": comparison.get("message") or "No provenance history is available for recommendations.",
         }
@@ -176,10 +232,21 @@ def get_execution_recommendations(
         ],
     }
 
+    # print("============= REC")
+    # print({
+    #     "sqlite_path": comparison["sqlite_path"],
+    #     "has_data": True,
+    #     "workflow_goal": workflow_goal,
+    #     "policy": comparison.get("policy"),
+    #     "recommendations": [recommendation],
+    #     "tools": comparison["tools"],
+    # })
+
     return {
         "sqlite_path": comparison["sqlite_path"],
         "has_data": True,
         "workflow_goal": workflow_goal,
+        "policy": comparison.get("policy"),
         "recommendations": [recommendation],
         "tools": comparison["tools"],
     }
@@ -242,6 +309,7 @@ def _load_tool_invocations(
         row
         for row in invocations
         if not is_ignored_tool_name(row["tool_name"], ignored_names)
+        and row["tool_name"].lower().strip() not in INVALID_RECOMMENDATION_TOOL_NAMES
         and (row.get("entity_type") or "").lower().strip() not in ignored_types
     ]
 
@@ -375,10 +443,32 @@ def _is_failure(row: dict[str, Any]) -> bool:
     return status in FAILED_STATUSES
 
 
-def _ranking_key(summary: dict[str, Any]) -> tuple[float, float, int]:
+def _resolve_policy(policy: str | None = None) -> str:
+    resolved = (policy or os.getenv("ANCHOR_SAILOR_POLICY") or DEFAULT_POLICY).strip().lower()
+    if resolved == "none":
+        resolved = DEFAULT_POLICY
+    if resolved not in SUPPORTED_POLICIES:
+        supported = ", ".join(sorted(SUPPORTED_POLICIES))
+        raise ValueError(f"Unsupported Sailor policy {resolved!r}. Supported values: {supported}")
+    return resolved
+
+
+def _max_failure_rate() -> float:
+    return float(os.getenv("ANCHOR_SAILOR_MAX_FAILURE_RATE", "0.2"))
+
+
+def _ranking_key(summary: dict[str, Any], policy: str) -> tuple[float, float, int]:
     duration = summary["average_duration_seconds"]
     duration_score = duration if duration is not None else float("inf")
-    return (summary["failure_rate"], duration_score, -summary["invocation_count"])
+    failure_rate = summary["failure_rate"]
+    failure_threshold_penalty = 0 if failure_rate <= _max_failure_rate() else 1
+
+    if policy == "speed":
+        return (failure_threshold_penalty, duration_score, failure_rate, -summary["invocation_count"])
+    if policy == "speed_reliability":
+        return (failure_threshold_penalty, duration_score, failure_rate, -summary["invocation_count"])
+
+    return (failure_rate, duration_score, -summary["invocation_count"])
 
 
 def _recommendation_text(recommended: dict[str, Any], alternatives: list[dict[str, Any]]) -> str:

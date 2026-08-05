@@ -10,7 +10,7 @@ from uuid import NAMESPACE_OID, UUID, uuid5
 
 from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor
 
-from anchor.telemetry.persistence.tinydb import (
+from anchor.telemetry.persistence import (
     capability_table,
     entity_table,
     intention_table,

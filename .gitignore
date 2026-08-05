@@ -22,3 +22,13 @@ examples/commons/phylogenetic_subtrees/data/output/validated-files
 
 examples/commons/synthetic_tool_selection/data/output/*.json
 examples/commons/synthetic_tool_selection/data/output/*/*.json
+
+examples/commons/synthetic_phylogenetic_subtrees/data/output/*.json
+examples/commons/synthetic_phylogenetic_subtrees/data/output/align
+examples/commons/synthetic_phylogenetic_subtrees/data/output/validated-files
+
+examples/commons/complex_phylogenetic_subtree/data/output/*.json
+examples/commons/complex_phylogenetic_subtree/data/output/align
+examples/commons/complex_phylogenetic_subtree/data/output/validated-files
+
+website/
